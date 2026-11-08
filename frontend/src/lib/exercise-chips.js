@@ -8,12 +8,13 @@ import { isWarmupRow, isSideSet } from './workout-model.js'
 const touched = s => !!(s.done || (isSideSet(s) && (s.sides.L?.done || s.sides.R?.done)))
 
 /** How far one exercise is: 'done' once every work set is ticked (a warm-up you skipped does not
- *  hold the chip back), 'partial' once anything is ticked, else 'todo'. An exercise with no rows
+ *  hold the chip back), or every row when the entry only has warm-ups. An exercise with no rows
  *  yet has nothing done. */
 export function entryProgress(entry) {
   const sets = entry?.sets || []
   const work = sets.filter(s => !isWarmupRow(s))
   if (work.length && work.every(s => s.done)) return 'done'
+  if (!work.length && sets.length && sets.every(s => s.done)) return 'done'
   return sets.some(touched) ? 'partial' : 'todo'
 }
 

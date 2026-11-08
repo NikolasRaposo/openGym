@@ -523,7 +523,7 @@ export default function RoutineEdit() {
       // (.tap-main, card dismiss pass), with the rail's buttons above it, so pressing Move up
       // neither opens the sheet nor fills the row. The long press treats it as the row
       // (data-row-open, useRoutineReorder).
-      const openEx = () => exConfigSheet(ex, e, cfg => edit(x => { x[i] = { id: x[i].id, sg: x[i].sg, ...(x[i].sg ? { sgName: x[i].sgName, sgRest: x[i].sgRest } : {}), ...cfg }; cleanupSg(x) }), removeHere, r, null, () => replace(i), undefined, { backups: true })
+      const openEx = () => exConfigSheet(ex, e, cfg => edit(x => { x[i] = { id: x[i].id, sg: x[i].sg, ...(x[i].sg ? { sgName: x[i].sgName, sgRest: x[i].sgRest } : {}), ...(x[i].id === ex.id && x[i].warmupExercise ? { warmupExercise: x[i].warmupExercise } : {}), ...cfg }; cleanupSg(x) }), removeHere, r, null, () => replace(i), undefined, { backups: true })
       const item = <div className={'item tap-host' + (inSS.has(i) ? ' in-ss' : '')}>
           {/* Shown on pointer devices only (index.css .routine-grip); the Move buttons and the
               long press stay the way in for a keyboard and a finger. */}

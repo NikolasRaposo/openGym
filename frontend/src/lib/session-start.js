@@ -4,12 +4,12 @@
 // Imports both history.js and progression.js (which itself imports history.js); nothing in
 // either imports this file, so there is no cycle.
 import { buildSets, applyIntensifierPlan, modeOf, barFloor, isBw, lastEntryFor, insertWarmupRow } from './history.js'
-import { isWarmupRow, isSideSet, syncSideAggregate } from './workout-model.js'
+import { isWarmupRow, isSideSet, makeSideSet, syncSideAggregate } from './workout-model.js'
 import { nextPrescription, applyPrescription, defaultIncrement, weightIncrement, plannedOf, deloadTo, DELOAD_FACTOR, policyFor } from './progression.js'
 import { dropGrid } from './plates.js'
 import { backoffStepOf, applyBackoff } from './backoff.js'
 import { dbLoadFor, historyAs, ownedWeightsFor, withMeaning } from './dumbbells.js'
-import { isAssisted } from './exercises.js'
+import { exerciseOf, isAssisted, isBuiltinEx } from './exercises.js'
 import { sessionHistory } from './backfill.js'
 import { programmeSlot, pctWeight } from './programmes.js'
 import { todayISO } from './format.js'
@@ -267,13 +267,40 @@ function freestyleEntry(st, id, cfg) {
 // into real work must exclude only its own exercises. The merge helper (lib/session-merge.js)
 // stamps `entry.rid`, so the single-routine and combined paths share this builder unchanged; it
 // only reads the routine's id, to start each exercise from that routine's own history (#216).
-export function buildSessionEntries(st, r) {
+function preparationFor(cfg, workIds) {
+  const prep = cfg?.warmupExercise
+  const ex = exerciseOf(prep?.id)
+  // History locates an exercise by id. A preparation with any work slot's id in this session
+  // would hide that work entry from its next-session baseline when both are saved together.
+  if (!isBuiltinEx(ex) || workIds.has(prep.id)) return null
+  const reps = Math.round(Number(prep.reps))
+  if (!Number.isFinite(reps) || reps < 1) return null
+  const side = prep.side === true
+  const rest = Math.round(Number(prep.rest))
+  const note = typeof prep.note === 'string' ? prep.note.trim() : ''
+  const target = {
+    mode: 'reps', sets: 1, reps: reps * (side ? 2 : 1), weight: 0,
+    ...(side ? { side: true } : {}),
+    ...(Number.isFinite(rest) && rest > 0 ? { restSec: rest } : {}),
+    ...(note ? { note } : {}),
+  }
+  const row = { w: 0, r: target.reps, done: false, phase: 'warmup', warmup: true }
+  return { id: prep.id, target, planned: plannedOf(target), plan: { policy: 'off', kind: 'off' },
+    sets: [side ? makeSideSet(row) : row], noProg: true }
+}
+
+export function buildSessionEntries(st, r, { workIds = new Set((r?.ex || []).map(slot => slot.id)) } = {}) {
   // The prescription is applied as the session is built, so you walk up to the bar with the
   // right weight already on the screen instead of being told about it afterwards.
   const noProg = r?.excludeFromProgression === true
-  return (r ? r.ex : []).map(cfg => {
-    const { deload, ...built } = buildPlannedEntry(st, cfg, r, { noProg })
+  return (r ? r.ex : []).flatMap(cfg => {
+    const prep = preparationFor(cfg, workIds)
+    // A separate native exercise owns the preparation. Suppress this slot's old ramp as well
+    // as any warm-up carried from its history; otherwise the session asks for both.
+    const workCfg = prep ? { ...cfg, warmup: 'none', warmupSets: 0 } : cfg
+    const { deload, ...built } = buildPlannedEntry(st, workCfg, r, { noProg })
     // A programme's deload week stays out of progression, as a deload routine does.
-    return { id: cfg.id, sg: cfg.sg, ...built, ...(noProg || deload ? { noProg: true } : {}) }
+    const work = { id: cfg.id, sg: cfg.sg, ...built, ...(noProg || deload ? { noProg: true } : {}) }
+    return prep ? [prep, work] : [work]
   })
 }

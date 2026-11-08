@@ -25,8 +25,9 @@ export function buildCombinedEntries(st, routineIds) {
     .filter(id => id && !seen.has(id) && seen.add(id))
     .map(id => (st.routines || []).find(r => r.id === id))
     .filter(Boolean)
+  const workIds = new Set(routines.flatMap(r => (r.ex || []).map(cfg => cfg.id)))
   const entries = routines.flatMap(r =>
-    buildSessionEntries(st, r).map(e => ({ ...e, rid: r.id }))
+    buildSessionEntries(st, r, { workIds }).map(e => ({ ...e, rid: r.id }))
   )
   return { entries, routineIds: routines.map(r => r.id), routines }
 }
